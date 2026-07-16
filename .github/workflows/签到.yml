@@ -2,22 +2,38 @@ name: 签到
 on:
   workflow_dispatch:
   schedule:
-    - cron: '10 17 * * *'
+    #sleep 0～3 小时 → 实际落在北京约 8:00～11:00
+    - cron: '7 0 * * *'
 permissions:
   contents: read
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 200   # 必须 ≥ 3 小时延迟 + 实际执行时间
     steps:
       - name: 检出仓库
         uses: actions/checkout@v4
+
+      # ★ 新增：执行时间落在北京 8:00～11:00
+      - name: 随机延迟（北京 8:00–11:00）
+        if: github.event_name == 'schedule'
+        run: |
+          # 0 ~ 10799 秒 ≈ 0～3 小时
+          DELAY=$((RANDOM % 10800))
+          H=$((DELAY / 3600))
+          M=$(((DELAY % 3600) / 60))
+          S=$((DELAY % 60))
+          echo "随机延迟 ${DELAY} 秒（约 ${H}小时${M}分${S}秒）"
+          echo "预计实际开始（北京时间）: $(TZ=Asia/Shanghai date -d "+${DELAY} seconds" '+%Y-%m-%d %H:%M:%S')"
+          sleep "$DELAY"
+
       - name: 创建 Node 环境
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: 'npm'
           cache-dependency-path: ./api/package-lock.json
+
       - name: 检查 GitHub CLI
         run: |
           if ! command -v gh >/dev/null 2>&1; then
